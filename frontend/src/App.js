@@ -26,8 +26,8 @@ function App() {
     });
 
     const res = await fetch(
-      `http://localhost:5000/api/pokemon/search?${params}`
-    );
+  "https://pokedex-backend-service.onrender.com/api/pokemon/search?" + params
+);
     const data = await res.json();
 
     setResults(data.data || []);
