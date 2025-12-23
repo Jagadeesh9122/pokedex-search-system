@@ -2,59 +2,51 @@ const Pokemon = require("../models/Pokemon");
 
 exports.searchPokemon = async (req, res) => {
   try {
-    const {
-      q,
-      type,
-      minAttack,
-      minHp,
-      minSpeed,
-      sortBy,
-      order
-    } = req.query;
+    const { q } = req.query;
 
+    if (!q || q.trim().length === 0) {
+      return res.json({ count: 0, data: [] });
+    }
+
+    const query = q.toLowerCase();
     const filter = {};
-    const sort = {};
 
-    
-    if (q) {
-      filter.name = { $regex: q, $options: "i" };
-    }
-
-    
-    if (type) {
-      filter.types = { $in: [type.toLowerCase()] };
-    }
-
-   
-
-    if (minAttack) {
-      filter["stats.attack"] = { $gte: Number(minAttack) };
-    }
-
-    if (minHp) {
-      filter["stats.hp"] = { $gte: Number(minHp) };
-    }
-
-    if (minSpeed) {
-      filter["stats.speed"] = { $gte: Number(minSpeed) };
-    }
-
-    
-    const allowedSortFields = [
-      "stats.attack",
-      "stats.hp",
-      "stats.speed"
+    // ---------- Semantic Parsing ----------
+    const TYPES = [
+      "electric","fire","water","grass","flying","psychic",
+      "rock","ground","ice","dragon","dark","fairy","steel",
+      "bug","ghost","poison","fighting","normal"
     ];
 
-    if (sortBy && allowedSortFields.includes(sortBy)) {
-      sort[sortBy] = order === "asc" ? 1 : -1;
+    const matchedTypes = TYPES.filter(type => query.includes(type));
+    if (matchedTypes.length > 0) {
+      filter.types = { $in: matchedTypes };
     }
 
+    if (query.includes("fast")) {
+      filter["stats.speed"] = { $gte: 80 };
+    }
 
+    if (query.includes("strong")) {
+      filter["stats.attack"] = { $gte: 80 };
+    }
 
-    const pokemon = await Pokemon.find(filter)
-      .sort(sort)
-      .limit(50);
+    if (query.includes("tank")) {
+      filter["stats.hp"] = { $gte: 80 };
+    }
+
+    // ---------- Full-text + Semantic Search ----------
+    const pokemon = await Pokemon.find(
+      {
+        $text: { $search: q },
+        ...filter
+      },
+      {
+        score: { $meta: "textScore" }
+      }
+    )
+      .sort({ score: { $meta: "textScore" } })
+      .limit(20);
 
     res.json({
       count: pokemon.length,
